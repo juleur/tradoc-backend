@@ -1,0 +1,25 @@
+version: "3.8"
+networks:
+  backend:
+    name: tradoc-dev-backend
+services:
+  db:
+    build: .
+    command: "-c logging_collector=on"
+    container_name: tradoc-dev-db
+    hostname: db
+    restart: on-failure
+    healthcheck:
+      test: "exit 0"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - ALLOW_IP_RANGE=0.0.0.0/0
+      - POSTGRES_DB=tradoc
+      - POSTGRES_USER=occitan
+      - POSTGRES_PASSWORD=french
+    ports:
+      - 5432:5432
+    volumes:
+      - ${HOME}/Coding/go/projects/tradoc/sql/tradoc.sql:/docker-entrypoint-initdb.d/tradoc.sql
+    networks:
+      - backend
