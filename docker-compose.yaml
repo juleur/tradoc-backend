@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  arangodb:
+    container_name: arangodb-dev
+    restart: always
+    image: arangodb:latest
+    ports:
+      - 8529:8529
+    environment:
+      - ARANGO_NO_AUTH=1
