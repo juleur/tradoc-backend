@@ -8,6 +8,10 @@ type Service interface {
 	SetRefreshToken(translatorID string) (string, error)
 	FindRefreshToken(refreshToken string) (*entities.Translator, error)
 	DeleteRefreshToken(refreshToken string) error
+	FetchSecretQuestionsByToken(token string) (*entities.TranslatorSecretQuestions, error)
+	FetchSecretQuestions() ([]string, error)
+	ProceedResetPassword(email string) (*entities.TranslatorResetPassword, error)
+	ResetPassword(translatorID string, hashedPassword string) error
 }
 
 type service struct {
@@ -38,4 +42,20 @@ func (s *service) FindRefreshToken(refreshToken string) (*entities.Translator, e
 
 func (s *service) DeleteRefreshToken(refreshToken string) error {
 	return s.repository.RemoveRefreshToken(refreshToken)
+}
+
+func (s *service) FetchSecretQuestionsByToken(token string) (*entities.TranslatorSecretQuestions, error) {
+	return s.repository.GetSecretQuestionsByToken(token)
+}
+
+func (s *service) FetchSecretQuestions() ([]string, error) {
+	return s.repository.GetSecretQuestions()
+}
+
+func (s *service) ProceedResetPassword(email string) (*entities.TranslatorResetPassword, error) {
+	return s.repository.CreateTokenResetPassword(email)
+}
+
+func (s *service) ResetPassword(translatorID string, hashedPassword string) error {
+	return s.repository.UpdatePassword(translatorID, hashedPassword)
 }

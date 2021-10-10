@@ -6,13 +6,14 @@ import (
 	"btradoc/pkg/dialect"
 	"btradoc/pkg/translation"
 	"btradoc/pkg/translator"
+	"btradoc/storage/inmemory"
 
 	"github.com/gofiber/fiber/v2"
 	jwtware "github.com/gofiber/jwt/v3"
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func PrivateEndpoints(app fiber.Router, secretKey string, translatorService translator.Service, dialectService dialect.Service, translationService translation.Service) {
+func PrivateEndpoints(app fiber.Router, secretKey string, translatorService translator.Service, dialectService dialect.Service, translationService translation.Service, activeTranslatorsTracker *inmemory.ActiveTranslators) {
 	api := app.Group("/p", jwtware.New(jwtware.Config{
 		SigningMethod:  jwt.SigningMethodHS256.Name,
 		SigningKey:     []byte(secretKey),
@@ -21,7 +22,7 @@ func PrivateEndpoints(app fiber.Router, secretKey string, translatorService tran
 	}))
 
 	api.Add("GET", "/dialects_subdialects", controllers.FetchDialectsWithSubdialects(dialectService))
-	api.Add("GET", "/get_datasets/:full_dialect", controllers.GetDatasets(translationService))
-	// api.Add("POST", "/add_new_translations", controllers.AddNewTranslations(s))
+	// api.Add("GET", "/get_datasets/:full_dialect", controllers.GetDatasets(translationService))
+	// api.Add("POST", "/add_new_translations", controllers.AddNewTranslations(translationService))
 	api.Add("GET", "/logout", controllers.Logout(translatorService))
 }

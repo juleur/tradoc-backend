@@ -1,15 +1,14 @@
-package tools
+package helpers
 
 import (
+	"log"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
 func CreateLogFile(logPath string) *os.File {
 	file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
 	if err != nil {
-		logrus.Fatal(err)
+		log.Fatalln(err)
 	}
 	return file
 }

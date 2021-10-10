@@ -1,7 +1,7 @@
 package entities
 
-type Dialect struct {
-	Name        string   `json:"name"`
+type Occitan struct {
+	Dialect     string   `json:"dialect"`
 	Subdialects []string `json:"subdialects"`
 }
 
@@ -11,14 +11,12 @@ type DialectSubdialectDocument struct {
 }
 
 type DialectSubdialects struct {
-	DialectID   string       `json:"dialect_id"`
 	Dialect     string       `json:"dialect"`
 	Subdialects []Subdialect `json:"subdialects"`
 }
 
 type Subdialect struct {
-	SubdialectID                 string `json:"subdialect_id"`
-	Subdialect                   string `json:"subdialect"`
-	TotalTranslations            int    `json:"total_translations"`
-	TotalTranslationByTranslator int    `json:"total_translation_by_translator"`
+	Name                        string `json:"name"`
+	TotalTranslated             int    `json:"totalTranslated"`
+	TotalTranslatedByTranslator int    `json:"totalTranslatedByTranslator"`
 }

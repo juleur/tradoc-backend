@@ -3,12 +3,13 @@ package main
 import (
 	"btradoc/api/middlewares"
 	"btradoc/api/routes"
-	"btradoc/entities"
+	"btradoc/helpers"
 	"btradoc/pkg/dialect"
+	"btradoc/pkg/email"
 	"btradoc/pkg/translation"
 	"btradoc/pkg/translator"
-	"btradoc/tools"
-	"crypto/rsa"
+	"btradoc/storage/inmemory"
+	"btradoc/storage/mongodb"
 	"flag"
 	"os"
 
@@ -18,41 +19,51 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const SECRET_KEY = "WE1Lb9XqN0P0REmFWLSccKNxjGikZzAECereA5bH17dxFX0rIx4DGIbHC4NUfUwu"
+//        /!\ NOT SAFE /!\        //
+const SECRET_KEY string = "WE1Lb9XqN0P0REmFWLSccKNxjGikZzAECereA5bH17dxFX0rIx4DGIbHC4NUfUwu"
 
 var (
 	TRANSLATIONS_FILES_PATH string
 	PRODUCTION_MOD          *bool
 	LOG_FILE                string
 	ALLOW_ORIGINS           string
-	PRIVATE_KEY             *rsa.PrivateKey
 )
 
 func init() {
-	db := tools.ArangoDBConnection()
-	dialects := tools.OpenDialectsJSONFile()
-
-	if err := tools.CreateCollection(db, entities.COLLECTIONS); err == nil {
-		tools.AddDialectsDocuments(db, dialects)
-	}
-	////////////
+	LOG_FILE = "logrus.log"
 
 	PRODUCTION_MOD = flag.Bool("prod", false, "a string")
 	flag.Parse()
 
 	if *PRODUCTION_MOD {
-		ALLOW_ORIGINS = "https://trad-oc.fr, https://trad-oc.fr, https://trad-oc.fr"
+		ALLOW_ORIGINS = "https://occitanofon.xyz, https://occitanofon.xyz"
 	} else {
 		ALLOW_ORIGINS = "http://127.0.0.1:3333"
 	}
-	LOG_FILE = "logrus.log"
+
+	mongodb.InitMongoDatabase()
 }
 
 func main() {
 	logger := logrus.New()
 	logger.ReportCaller = true
 
-	db := tools.ArangoDBConnection()
+	if *PRODUCTION_MOD {
+		file := helpers.CreateLogFile(LOG_FILE)
+		defer file.Close()
+
+		logger.SetOutput(file)
+		logger.Formatter = &logrus.JSONFormatter{}
+	} else {
+		logger.SetOutput(os.Stdout)
+		logger.SetFormatter(&logrus.TextFormatter{
+			ForceColors:   true,
+			FullTimestamp: true,
+		})
+	}
+
+	db := mongodb.NewMongoClient()
+	activeTranslatorsTracker := inmemory.NewActiveTranslatorsTracker()
 
 	translatorRepo := translator.NewRepo(db)
 	translatorService := translator.NewService(translatorRepo)
@@ -63,22 +74,13 @@ func main() {
 	translationRepo := translation.NewRepo(db)
 	translationService := translation.NewService(translationRepo)
 
+	emailService := email.NewService(db)
+	emailService.Mailer(logger)
+
 	app := fiber.New()
 
-	if *PRODUCTION_MOD {
-		file := tools.CreateLogFile(LOG_FILE)
-		defer file.Close()
-
-		logger.SetOutput(file)
-		logger.Formatter = &logrus.JSONFormatter{}
-	} else {
+	if !*PRODUCTION_MOD {
 		app.Use(log.New())
-
-		logger.SetOutput(os.Stdout)
-		logger.SetFormatter(&logrus.TextFormatter{
-			ForceColors:   true,
-			FullTimestamp: true,
-		})
 	}
 
 	app.Use(cors.New(cors.Config{
@@ -90,8 +92,8 @@ func main() {
 
 	app.Use(middlewares.Logrus(logger))
 
-	routes.PrivateEndpoints(app, SECRET_KEY, translatorService, dialectService, translationService)
-	routes.PublicEndpoints(app, SECRET_KEY, translatorService, dialectService)
+	routes.PrivateEndpoints(app, SECRET_KEY, translatorService, dialectService, translationService, activeTranslatorsTracker)
+	routes.PublicEndpoints(app, SECRET_KEY, translatorService, dialectService, translationService, emailService)
 
 	_ = app.Listen(":9321")
 }

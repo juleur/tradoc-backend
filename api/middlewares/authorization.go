@@ -12,10 +12,9 @@ func JWTSuccessHandler() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		user := c.Locals("user").(*jwt.Token)
 		claims := user.Claims.(jwt.MapClaims)
-		translatorKey := claims["sub"].(string)
+		translatorID := claims["sub"].(string)
 
-		// match ArangoDB
-		c.Locals("translatorID", "translators/"+translatorKey)
+		c.Locals("translatorID", translatorID)
 
 		return c.Next()
 	}
@@ -29,6 +28,7 @@ func JWTErrorHandler(secretKey string) func(c *fiber.Ctx, err error) error {
 		_, err = jwt.ParseWithClaims(bearerJWTSplit[1], &entities.JWTCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 			return []byte(secretKey), nil
 		})
+
 		if err := err.(*jwt.ValidationError); err.Errors == jwt.ValidationErrorExpired {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "TOKEN_EXPIRED",

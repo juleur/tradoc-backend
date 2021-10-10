@@ -1,6 +1,7 @@
-package tools
+package helpers
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
+// IsEmailValid checks if email has valid length, match regex and host exists
 func IsEmailValid(email string) bool {
 	if len(email) < 3 && len(email) > 254 {
 		return false
@@ -31,7 +33,11 @@ func IsEmailValid(email string) bool {
 
 func UsernameValidity(username string) error {
 	if len(username) < 3 {
-		return fmt.Errorf("ton pseudo est trop court (3 caractères minimum)")
+		return &HelperError{
+			Code:    409,
+			Message: ErrUsernameTooShort,
+			Wrapped: errors.New("username too short"),
+		}
 	}
 
 	if err := onlyListedCaracters(username); err != nil {
@@ -45,13 +51,33 @@ func UsernameValidity(username string) error {
 	return nil
 }
 
+func Normalize(str string) (string, error) {
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, err := transform.String(t, str)
+	if err != nil {
+		return "", &HelperError{
+			Code:    500,
+			Message: ErrDefault,
+			Wrapped: err,
+		}
+	}
+
+	return result, nil
+}
+
+// onlyOneSpace checks if username has only one space
 func onlyOneSpace(username string) error {
 	if count := strings.Count(username, " "); count > 1 {
-		return fmt.Errorf("pas mai que 1 espaci")
+		return &HelperError{
+			Code:    409,
+			Message: ErrOnlyOneSpaceByUsername,
+			Wrapped: errors.New("only one space by username"),
+		}
 	}
 	return nil
 }
 
+// onlyListedCaracters checks if username letters match occitan alphabet
 func onlyListedCaracters(username string) error {
 	// lettres autorisées
 	// à è ò á é í ó ú ï ü ç
@@ -75,14 +101,12 @@ func onlyListedCaracters(username string) error {
 			c == 'L' || c == 'M' || c == 'N' || c == 'O' || c == 'P' ||
 			c == 'Q' || c == 'R' || c == 'S' || c == 'T' || c == 'U' ||
 			c == 'V' || c == 'X' || c == 'Z' || c == ' ') {
-			return fmt.Errorf("lo caractère “%c“ es pas defendut", c)
+			return &HelperError{
+				Code:    409,
+				Message: fmt.Sprintf("Lo caractère “%c“ es pas defendut", c),
+				Wrapped: fmt.Errorf("%c is not allowed", c),
+			}
 		}
 	}
 	return nil
-}
-
-func Normalize(str string) (string, error) {
-	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	result, _, err := transform.String(t, str)
-	return result, err
 }
