@@ -9,10 +9,10 @@ import (
 )
 
 // openDialectsJSONFile opens occitan dialects json file where all subdialects are ordered by dialect
-func openDialectsJSONFile(path string) []entities.Occitan {
+func openDialectsJSONFile(path string) []entities.OccitanJSONFile {
 	byteValue := opener(path)
 
-	dialects := []entities.Occitan{}
+	dialects := []entities.OccitanJSONFile{}
 	err := json.Unmarshal(byteValue, &dialects)
 	if err != nil {
 		log.Fatalln(err)

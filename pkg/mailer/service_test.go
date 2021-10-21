@@ -1,4 +1,4 @@
-package email
+package mailer
 
 import (
 	"btradoc/entities"
@@ -6,10 +6,9 @@ import (
 	"testing"
 )
 
-func TestEmailService(t *testing.T) {
+func TestMailer(t *testing.T) {
 	db := mongodb.NewMongoClient()
-	emailService := NewService(db)
-	emailService.Mailer(nil) // smtp disable for now
+	mailerService := NewService(db, nil)
 
 	translTest := &entities.TranslatorResetPassword{
 		Email:    "test@test.com",
@@ -18,6 +17,6 @@ func TestEmailService(t *testing.T) {
 	}
 
 	for i := 10_000; i > 0; i-- {
-		emailService.SendResetPasswordLink(translTest)
+		mailerService.SendResetPasswordLink(translTest)
 	}
 }

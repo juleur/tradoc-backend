@@ -8,27 +8,25 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func FetchDialectsWithSubdialects(dialectService dialect.Service) func(c *fiber.Ctx) error {
+func GetOccitan(dialectService dialect.Service) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		logger := c.Locals("logger").(*logrus.Logger)
 
 		translatorID := c.Locals("translatorID").(string)
 
-		dialectsSubdialects, err := dialectService.FetchDialectsSubdialect(translatorID)
+		occitan, err := dialectService.FetchOccitan(translatorID)
 		if err != nil {
 			logger.Error(err)
-			switch err.(type) {
-			case pkg.DBError:
-				return c.Status(err.(*pkg.DBError).Code).JSON(fiber.Map{
-					"error": err.(*pkg.DBError).Message,
-				})
-			default:
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": ErrDefault,
+			if e, ok := err.(*pkg.DBError); ok {
+				return c.Status(e.Code).JSON(fiber.Map{
+					"error": e.Message,
 				})
 			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": ErrDefault,
+			})
 		}
 
-		return c.JSON(dialectsSubdialects)
+		return c.JSON(occitan)
 	}
 }

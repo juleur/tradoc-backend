@@ -1,53 +1,34 @@
 package translation
 
 import (
+	"btradoc/entities"
 	"btradoc/storage/mongodb"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFetchSentencesToTranslate(t *testing.T) {
+func TestAddTranslations(t *testing.T) {
 	db := mongodb.NewMongoClient()
 	translationRepo := NewRepo(db)
 	translationService := NewService(translationRepo)
 
-	fullDialect := "auvernhat_estandard"
-	datasets, err := translationService.FetchDatasets(fullDialect)
+	translatorID := ""
+	translations := []entities.Translation{
+		{
+			Oc:        "Es de Canadà mai naissèt en Anglatèrra",
+			Fr:        "Je suis au Canada mais je suis né en Angleterre",
+			En:        "I'm in Canada but I was born in England",
+			DatasetID: "9969",
+			Occitan:   "auvernhat_estandard",
+		},
+	}
+
+	err := translationService.AddTranslations(translatorID, translations)
 	assert.Nil(t, err)
-	t.Logf("%+v\n", datasets)
 }
 
-// func TestAddTranslations(t *testing.T) {
-// 	db := tools.ArangoDBConnection()
-
-// 	translationRepo := NewRepo(db)
-// 	translationService := NewService(translationRepo)
-
-// 	translations := []*entities.Translation{
-// 		{
-// 			Oc: "Es de Canadà mai naissèt en Anglatèrra",
-// 			Fr: "Je suis au Canada mais je suis né en Angleterre",
-// 			// En:           "I'm in Canada but I was born in England",
-// 			TranslatorID: "translators/3370",
-// 			DatasetID:    "datasets/9969",
-// 			FullDialect:  "auvernhat-estandard",
-// 		},
-// 		{
-// 			Oc:           "E tanben parles fòrça ben",
-// 			Fr:           "Et aussi tu parles assez bien",
-// 			En:           "And also you talk pretty good",
-// 			TranslatorID: "translators/3370",
-// 			DatasetID:    "datasets/9975",
-// 			FullDialect:  "auvernhat-estandard",
-// 		},
-// 	}
-
-// 	err := translationService.AddTranslations(translations)
-// 	assert.Nil(t, err)
-// }
-
-func TestGetTotalOnGoingTranslation(t *testing.T) {
+func TestFetchTotalOnGoingTranslations(t *testing.T) {
 	db := mongodb.NewMongoClient()
 	translationRepo := NewRepo(db)
 	translationService := NewService(translationRepo)
@@ -60,28 +41,32 @@ func TestGetTotalOnGoingTranslation(t *testing.T) {
 	t.Logf("total: %d", counter)
 }
 
-func TestInsertDatasetsOnGoingTranslations(t *testing.T) {
+func TestAddOnGoingTranslations(t *testing.T) {
 	db := mongodb.NewMongoClient()
 	translationRepo := NewRepo(db)
 	translationService := NewService(translationRepo)
 
 	fullDialect := "auvernhat_estandard"
 
-	datasets, err := translationService.FetchDatasets(fullDialect)
-	assert.Nil(t, err)
+	datasets := []entities.Dataset{
+		{
+			ID:       "",
+			Sentence: "",
+		},
+	}
 
 	translatorID := "6148c3f1ba78b40cdeb49288"
 
-	err = translationService.AddOnGoingTranslations(fullDialect, translatorID, datasets)
+	err := translationService.AddOnGoingTranslations(fullDialect, translatorID, datasets)
 	assert.Nil(t, err)
 }
 
-func TestGetTranslationsFiles(t *testing.T) {
+func TestFetchPathnameFiles(t *testing.T) {
 	db := mongodb.NewMongoClient()
 	translationRepo := NewRepo(db)
 	translationService := NewService(translationRepo)
 
-	translationsFiles, err := translationService.FetchTranslationsFiles()
+	translationsFiles, err := translationService.FetchPathnameFiles()
 	assert.Nil(t, err)
-	t.Logf("%+v\n", *translationsFiles)
+	t.Logf("%+v\n", translationsFiles)
 }

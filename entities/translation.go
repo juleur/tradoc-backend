@@ -1,16 +1,11 @@
 package entities
 
-type TranslationsBody struct {
-	Translations []*Translation `json:"translations"`
-}
-
 type Translation struct {
-	Oc           string `json:"oc"`
-	Fr           string `json:"fr"`
-	En           string `json:"en"`
-	DatasetID    string `json:"datasetID"`
-	TranslatorID string `json:"translatorID"`
-	FullDialect  string `json:"fullDialect"`
+	Oc        string `json:"oc"`
+	Fr        string `json:"fr"`
+	En        string `json:"en"`
+	DatasetID string `json:"datasetID"`
+	Occitan   string `json:"occitan"`
 }
 
 type TranslationFile struct {

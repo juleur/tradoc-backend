@@ -1,4 +1,4 @@
-package inmemory
+package activity
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestActiveTranslators(t *testing.T) {
-	activeTranslators := NewActiveTranslatorsTracker()
+	activeTranslators := NewService()
 
 	translatorIDs := []string{
 		"614d86064145d514a16cf2cf",

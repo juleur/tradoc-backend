@@ -4,11 +4,13 @@ import (
 	"btradoc/api/middlewares"
 	"btradoc/api/routes"
 	"btradoc/helpers"
+	"btradoc/pkg/account"
+	"btradoc/pkg/activity"
+	"btradoc/pkg/auth"
+	"btradoc/pkg/dataset"
 	"btradoc/pkg/dialect"
-	"btradoc/pkg/email"
+	"btradoc/pkg/mailer"
 	"btradoc/pkg/translation"
-	"btradoc/pkg/translator"
-	"btradoc/storage/inmemory"
 	"btradoc/storage/mongodb"
 	"flag"
 	"os"
@@ -19,14 +21,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//        /!\ NOT SAFE /!\        //
-const SECRET_KEY string = "WE1Lb9XqN0P0REmFWLSccKNxjGikZzAECereA5bH17dxFX0rIx4DGIbHC4NUfUwu"
-
 var (
-	TRANSLATIONS_FILES_PATH string
-	PRODUCTION_MOD          *bool
-	LOG_FILE                string
-	ALLOW_ORIGINS           string
+	PRODUCTION_MOD *bool
+	LOG_FILE       string
+	ALLOW_ORIGINS  string
 )
 
 func init() {
@@ -36,7 +34,7 @@ func init() {
 	flag.Parse()
 
 	if *PRODUCTION_MOD {
-		ALLOW_ORIGINS = "https://occitanofon.xyz, https://occitanofon.xyz"
+		ALLOW_ORIGINS = "https://trad.occitanofon.org, https://occitanofon.org"
 	} else {
 		ALLOW_ORIGINS = "http://127.0.0.1:3333"
 	}
@@ -63,19 +61,25 @@ func main() {
 	}
 
 	db := mongodb.NewMongoClient()
-	activeTranslatorsTracker := inmemory.NewActiveTranslatorsTracker()
 
-	translatorRepo := translator.NewRepo(db)
-	translatorService := translator.NewService(translatorRepo)
+	accountRepo := account.NewRepo(db)
+	accountService := account.NewService(accountRepo)
+
+	activityService := activity.NewService()
+
+	authRepo := auth.NewRepo(db)
+	authService := auth.NewService(authRepo)
+
+	datasetRepo := dataset.NewRepo(db)
+	datasetService := dataset.NewService(datasetRepo)
 
 	dialectRepo := dialect.NewRepo(db)
 	dialectService := dialect.NewService(dialectRepo)
 
+	mailerService := mailer.NewService(db, logger)
+
 	translationRepo := translation.NewRepo(db)
 	translationService := translation.NewService(translationRepo)
-
-	emailService := email.NewService(db)
-	emailService.Mailer(logger)
 
 	app := fiber.New()
 
@@ -85,15 +89,15 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     ALLOW_ORIGINS,
-		AllowMethods:     "GET,POST,DELETE,OPTIONS",
-		AllowHeaders:     "Origin, Content-Type, Accept, Cookie, Authorization, Set-Cookie",
+		AllowMethods:     "GET,POST,OPTIONS",
+		AllowHeaders:     "Accept,Authorization,Content-Type,Cookie,Origin,Set-Cookie",
 		AllowCredentials: true,
 	}))
 
 	app.Use(middlewares.Logrus(logger))
 
-	routes.PrivateEndpoints(app, SECRET_KEY, translatorService, dialectService, translationService, activeTranslatorsTracker)
-	routes.PublicEndpoints(app, SECRET_KEY, translatorService, dialectService, translationService, emailService)
+	routes.PrivateEndpoints(app, accountService, activityService, authService, datasetService, dialectService, mailerService, translationService)
+	routes.PublicEndpoints(app, accountService, activityService, authService, datasetService, dialectService, mailerService, translationService)
 
 	_ = app.Listen(":9321")
 }

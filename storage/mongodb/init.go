@@ -24,15 +24,15 @@ var (
 
 var mongo_COLLECTIONS = [...]mongoCollection{
 	{
-		Name:    "Datasets",
+		Name:    Datasets.ColletionName(),
 		Indexes: []mongo.IndexModel{},
 	},
 	{
-		Name:    "Occitan",
+		Name:    Occitan.ColletionName(),
 		Indexes: []mongo.IndexModel{},
 	},
 	{
-		Name: "OnGoingTranslations",
+		Name: OnGoingTranslations.ColletionName(),
 		Indexes: []mongo.IndexModel{
 			{
 				Keys:    bson.D{{Key: "createdAt", Value: 1}},
@@ -41,11 +41,11 @@ var mongo_COLLECTIONS = [...]mongoCollection{
 		},
 	},
 	{
-		Name:    "SecretQuestions",
+		Name:    SecretQuestions.ColletionName(),
 		Indexes: []mongo.IndexModel{},
 	},
 	{
-		Name: "TemporaryTokens",
+		Name: TemporaryTokens.ColletionName(),
 		Indexes: []mongo.IndexModel{
 			{
 				Keys:    bson.D{{Key: "issuedAt", Value: 1}},
@@ -54,15 +54,15 @@ var mongo_COLLECTIONS = [...]mongoCollection{
 		},
 	},
 	{
-		Name:    "Translations",
+		Name:    Translations.ColletionName(),
 		Indexes: []mongo.IndexModel{},
 	},
 	{
-		Name:    "TranslationsFiles",
+		Name:    TranslationsFiles.ColletionName(),
 		Indexes: []mongo.IndexModel{},
 	},
 	{
-		Name: "Translators",
+		Name: Translations.ColletionName(),
 		Indexes: []mongo.IndexModel{
 			{
 				Keys:    bson.D{{Key: "username", Value: 1}},
@@ -80,9 +80,10 @@ var mongo_COLLECTIONS = [...]mongoCollection{
 	},
 }
 
+// InitMongoDatabase initializes datas
 func InitMongoDatabase() {
-	occitan := openDialectsJSONFile("./../../data/occitan.json")
-	secretQuestions := openSecretQuestions("./../../data/secret-questions.json")
+	occitan := openDialectsJSONFile("./data/occitan.json")
+	secretQuestions := openSecretQuestions("./data/secret-questions.json")
 
 	mongodb := NewMongoClient()
 	createCollections(mongodb, mongo_COLLECTIONS[:])
@@ -115,7 +116,7 @@ func createCollections(db *mongo.Database, collections []mongoCollection) {
 }
 
 // addOccitanDialects adds all occitan dialects to a specified Collection
-func addOccitanDialects(db *mongo.Database, occitan []entities.Occitan) {
+func addOccitanDialects(db *mongo.Database, occitan []entities.OccitanJSONFile) {
 	occitanColl := db.Collection("Occitan")
 	count, err := occitanColl.CountDocuments(context.Background(), bson.D{})
 	if err != nil {

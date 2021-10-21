@@ -1,6 +1,6 @@
 package entities
 
 type Dataset struct {
-	ID       string `json:"_id" bson:"_id"`
+	ID       string `json:"id" bson:"_id"`
 	Sentence string `json:"sentence" bson:"sentence"`
 }

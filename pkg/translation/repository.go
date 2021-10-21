@@ -4,6 +4,7 @@ import (
 	"btradoc/entities"
 	"btradoc/pkg"
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -12,13 +13,11 @@ import (
 )
 
 type Repository interface {
-	GetDatasets(fullDialect string) (*[]entities.Dataset, error)
-	AddNewFullDialectToDataset(translations []*entities.Translation) error
-	InsertTranslations(translations []*entities.Translation) error
+	InsertTranslations(translatorID string, translations []entities.Translation) error
 	GetTotalOnGoingTranslation(fullDialect, translatorID string) (int, error)
-	InsertDatasetsOnGoingTranslations(fullDialect, translatorID string, datasets *[]entities.Dataset) error
-	RemoveDatasetsOnGoingTranslations(translations []*entities.Translation) error
-	GetTranslationsFiles() (*[]entities.TranslationFile, error)
+	InsertDatasetsOnGoingTranslations(fullDialect, translatorID string, datasets []entities.Dataset) error
+	RemoveDatasetsOnGoingTranslations(translations []entities.Translation) error
+	GetTranslationsFiles() ([]entities.TranslationFile, error)
 }
 
 type repository struct {
@@ -31,69 +30,22 @@ func NewRepo(mongoDB *mongo.Database) Repository {
 	}
 }
 
-// GetDatasets gets datasets according the dialect and subdialect wanted
-func (r *repository) GetDatasets(fullDialect string) (*[]entities.Dataset, error) {
-	matchStage := bson.D{{Key: "$match", Value: bson.D{{Key: "translatedIn", Value: bson.D{{Key: "$nin", Value: []interface{}{fullDialect}}}}}}}
-	lookupStage := bson.D{{Key: "$lookup", Value: bson.D{{Key: "from", Value: "OnGoingTranslations"}, {Key: "localField", Value: "_id"}, {Key: "foreignField", Value: "dataset"}, {Key: "as", Value: "join"}}}}
-	match2Stage := bson.D{{Key: "$match", Value: bson.D{{Key: "join", Value: bson.D{{Key: "$size", Value: 0}}}}}}
-	projectStage := bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "sentence", Value: 1}}}}
-	sampleStage := bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: 5}}}}
-
-	datasetsColl := r.MongoDB.Collection("Datasets")
-	ctx := context.Background()
-	cursor, err := datasetsColl.Aggregate(ctx, mongo.Pipeline{matchStage, lookupStage, match2Stage, projectStage, sampleStage})
-	if err != nil {
-		return nil, &pkg.DBError{
-			Code:    500,
-			Message: pkg.ErrDefault,
-			Wrapped: err,
-		}
-	}
-	defer cursor.Close(ctx)
-
-	var datasets []entities.Dataset
-	if err = cursor.All(ctx, &datasets); err != nil {
-		return nil, &pkg.DBError{
-			Code:    500,
-			Message: pkg.ErrDefault,
-			Wrapped: err,
-		}
-	}
-
-	return &datasets, nil
-}
-
-func (r *repository) AddNewFullDialectToDataset(translations []*entities.Translation) error {
-	datasetsColl := r.MongoDB.Collection("Datasets")
-
-	for _, translation := range translations {
-		if _, err := datasetsColl.UpdateOne(context.Background(), bson.M{"dataset": translation.DatasetID}, bson.D{{Key: "$push", Value: bson.D{{Key: "translatedIn", Value: translation.FullDialect}}}}); err != nil {
-			return &pkg.DBError{
-				Code:    500,
-				Message: pkg.ErrDefault,
-				Wrapped: err,
-			}
-		}
-	}
-
-	return nil
-}
-
 // InsertTranslations inserts datasets translated in Occitan dialect -> French and/or Occitan dialect -> English
-func (r *repository) InsertTranslations(translations []*entities.Translation) error {
+func (r *repository) InsertTranslations(translatorID string, translations []entities.Translation) error {
 	translationColl := r.MongoDB.Collection("Translations")
+
+	translatorObjectID, err := primitive.ObjectIDFromHex(translatorID)
+	if err != nil {
+		return &pkg.DBError{
+			Code:    500,
+			Message: pkg.ErrDefault,
+			Wrapped: err,
+		}
+	}
 
 	var translationDocs []interface{}
 	for _, translation := range translations {
-		translatorID, err := primitive.ObjectIDFromHex(translation.TranslatorID)
-		if err != nil {
-			return &pkg.DBError{
-				Code:    500,
-				Message: pkg.ErrDefault,
-				Wrapped: err,
-			}
-		}
-		datasetID, err := primitive.ObjectIDFromHex(translation.DatasetID)
+		datasetObjectID, err := primitive.ObjectIDFromHex(translation.DatasetID)
 		if err != nil {
 			return &pkg.DBError{
 				Code:    500,
@@ -103,13 +55,14 @@ func (r *repository) InsertTranslations(translations []*entities.Translation) er
 		}
 
 		// english translation
-		if len(translation.En) == 0 {
+		if len(translation.En) > 0 {
 			doc := bson.D{
 				{Key: "oc", Value: translation.Oc},
 				{Key: "en", Value: translation.En},
-				{Key: "translator", Value: translatorID},
-				{Key: "dataset", Value: datasetID},
-				{Key: "occitan", Value: translation.FullDialect},
+				{Key: "translator", Value: translatorObjectID},
+				{Key: "dataset", Value: datasetObjectID},
+				{Key: "occitan", Value: translation.Occitan},
+				{Key: "createdAt", Value: primitive.NewDateTimeFromTime(time.Now())},
 			}
 			translationDocs = append(translationDocs, doc)
 		}
@@ -117,9 +70,10 @@ func (r *repository) InsertTranslations(translations []*entities.Translation) er
 		doc := bson.D{
 			{Key: "oc", Value: translation.Oc},
 			{Key: "fr", Value: translation.Fr},
-			{Key: "translator", Value: translatorID},
-			{Key: "dataset", Value: datasetID},
-			{Key: "occitan", Value: translation.FullDialect},
+			{Key: "translator", Value: translatorObjectID},
+			{Key: "dataset", Value: datasetObjectID},
+			{Key: "occitan", Value: translation.Occitan},
+			{Key: "createdAt", Value: primitive.NewDateTimeFromTime(time.Now())},
 		}
 		translationDocs = append(translationDocs, doc)
 	}
@@ -152,6 +106,7 @@ func (r *repository) GetTotalOnGoingTranslation(fullDialect, translatorID string
 
 	cursor, err := onGoingTranslations.Find(ctx, primitive.D{{Key: "translator", Value: translatorObjectID}, {Key: "occitan", Value: fullDialect}})
 	if err != nil {
+		fmt.Println(err)
 		return 0, &pkg.DBError{
 			Code:    500,
 			Message: pkg.ErrDefault,
@@ -173,7 +128,7 @@ func (r *repository) GetTotalOnGoingTranslation(fullDialect, translatorID string
 }
 
 // InsertDatasetsOnGoingTranslations inserts datasets that's being translated in order to prevent duplications
-func (r *repository) InsertDatasetsOnGoingTranslations(fullDialect, translatorID string, datasets *[]entities.Dataset) error {
+func (r *repository) InsertDatasetsOnGoingTranslations(fullDialect, translatorID string, datasets []entities.Dataset) error {
 	translatorObjectID, err := primitive.ObjectIDFromHex(translatorID)
 	if err != nil {
 		return &pkg.DBError{
@@ -186,7 +141,7 @@ func (r *repository) InsertDatasetsOnGoingTranslations(fullDialect, translatorID
 	ogtColl := r.MongoDB.Collection("OnGoingTranslations")
 
 	var datasetDocs []interface{}
-	for _, d := range *datasets {
+	for _, d := range datasets {
 		ID, err := primitive.ObjectIDFromHex(d.ID)
 		if err != nil {
 			return &pkg.DBError{
@@ -196,11 +151,10 @@ func (r *repository) InsertDatasetsOnGoingTranslations(fullDialect, translatorID
 			}
 		}
 		doc := bson.D{
-			{Key: "fullDialect", Value: "fmt.Sprintf"},
 			{Key: "occitan", Value: fullDialect},
 			{Key: "dataset", Value: ID},
 			{Key: "translator", Value: translatorObjectID},
-			{Key: "createdAt", Value: time.Now()},
+			{Key: "createdAt", Value: primitive.NewDateTimeFromTime(time.Now())},
 		}
 
 		datasetDocs = append(datasetDocs, doc)
@@ -218,11 +172,11 @@ func (r *repository) InsertDatasetsOnGoingTranslations(fullDialect, translatorID
 }
 
 // RemoveDatasetsOnGoingTranslations deletes dataset that has been translated
-func (r *repository) RemoveDatasetsOnGoingTranslations(translations []*entities.Translation) error {
+func (r *repository) RemoveDatasetsOnGoingTranslations(translations []entities.Translation) error {
 	onGoingTranslationsColl := r.MongoDB.Collection("OnGoingTranslations")
 
 	for _, translation := range translations {
-		datasetIDObject, err := primitive.ObjectIDFromHex(translation.DatasetID)
+		datasetObjectID, err := primitive.ObjectIDFromHex(translation.DatasetID)
 		if err != nil {
 			return &pkg.DBError{
 				Code:    500,
@@ -231,7 +185,7 @@ func (r *repository) RemoveDatasetsOnGoingTranslations(translations []*entities.
 			}
 		}
 
-		if _, err := onGoingTranslationsColl.DeleteOne(context.Background(), bson.D{{Key: "dataset", Value: datasetIDObject}, {Key: "occitan", Value: translation.FullDialect}}); err != nil {
+		if _, err := onGoingTranslationsColl.DeleteOne(context.Background(), bson.D{{Key: "dataset", Value: datasetObjectID}, {Key: "occitan", Value: translation.Occitan}}); err != nil {
 			return &pkg.DBError{
 				Code:    500,
 				Message: pkg.ErrDefault,
@@ -244,7 +198,7 @@ func (r *repository) RemoveDatasetsOnGoingTranslations(translations []*entities.
 }
 
 // GetTranslationsFiles fetches translation filenames (occitan->french & occitan->english)
-func (r *repository) GetTranslationsFiles() (*[]entities.TranslationFile, error) {
+func (r *repository) GetTranslationsFiles() ([]entities.TranslationFile, error) {
 	translationsFilesColl := r.MongoDB.Collection("TranslationsFiles")
 
 	ctx := context.Background()
@@ -272,5 +226,5 @@ func (r *repository) GetTranslationsFiles() (*[]entities.TranslationFile, error)
 		}
 	}
 
-	return &tfs, nil
+	return tfs, nil
 }

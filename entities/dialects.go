@@ -1,6 +1,6 @@
 package entities
 
-type Occitan struct {
+type OccitanJSONFile struct {
 	Dialect     string   `json:"dialect"`
 	Subdialects []string `json:"subdialects"`
 }
@@ -10,7 +10,7 @@ type DialectSubdialectDocument struct {
 	Subdialect string `json:"subdialect"`
 }
 
-type DialectSubdialects struct {
+type Occitan struct {
 	Dialect     string       `json:"dialect"`
 	Subdialects []Subdialect `json:"subdialects"`
 }

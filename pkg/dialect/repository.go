@@ -11,7 +11,8 @@ import (
 )
 
 type Repository interface {
-	GetDialectsSubdialect(translatorID string) (*[]entities.DialectSubdialects, error)
+	IsItExists(dialect, subdialect string) (bool, error)
+	GetOccitanWithFurtherInfo(translatorID string) ([]entities.Occitan, error)
 }
 
 type repository struct {
@@ -24,9 +25,28 @@ func NewRepo(mongoDB *mongo.Database) Repository {
 	}
 }
 
-func (r *repository) GetDialectsSubdialect(translatorID string) (*[]entities.DialectSubdialects, error) {
+func (r *repository) IsItExists(dialect, subdialect string) (bool, error) {
 	occitanColl := r.MongoDB.Collection("Occitan")
-	ID, err := primitive.ObjectIDFromHex(translatorID)
+
+	var result bson.M
+	if err := occitanColl.FindOne(context.Background(), bson.D{{Key: "dialectName", Value: dialect}, {Key: "subdialectName", Value: subdialect}}).Decode(&result); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		}
+		return false, &pkg.DBError{
+			Code:    500,
+			Message: pkg.ErrDefault,
+			Wrapped: err,
+		}
+	}
+
+	return true, nil
+}
+
+func (r *repository) GetOccitanWithFurtherInfo(translatorID string) ([]entities.Occitan, error) {
+	occitanColl := r.MongoDB.Collection("Occitan")
+
+	translatorObjectID, err := primitive.ObjectIDFromHex(translatorID)
 	if err != nil {
 		return nil, &pkg.DBError{
 			Code:    500,
@@ -54,7 +74,7 @@ func (r *repository) GetDialectsSubdialect(translatorID string) (*[]entities.Dia
 				{Key: "$filter", Value: bson.D{
 					{Key: "input", Value: "$totalTranslated"},
 					{Key: "as", Value: "tt"},
-					{Key: "cond", Value: bson.D{{Key: "$eq", Value: []interface{}{"$$tt.translator", ID}}}},
+					{Key: "cond", Value: bson.D{{Key: "$eq", Value: []interface{}{"$$tt.translator", translatorObjectID}}}},
 				},
 				}}},
 		}},
@@ -92,14 +112,14 @@ func (r *repository) GetDialectsSubdialect(translatorID string) (*[]entities.Dia
 	}
 	defer cursor.Close(ctx)
 
-	var result []entities.DialectSubdialects
-	if err = cursor.All(ctx, &result); err != nil {
+	var occitan []entities.Occitan
+	if err = cursor.All(ctx, &occitan); err != nil {
 		return nil, &pkg.DBError{
 			Code:    500,
 			Message: pkg.ErrDefault,
 			Wrapped: err,
 		}
-	} else if len(result) == 0 {
+	} else if len(occitan) == 0 {
 		return nil, &pkg.DBError{
 			Code:    404,
 			Message: pkg.ErrDialectNotFound,
@@ -107,5 +127,5 @@ func (r *repository) GetDialectsSubdialect(translatorID string) (*[]entities.Dia
 		}
 	}
 
-	return &result, nil
+	return occitan, nil
 }

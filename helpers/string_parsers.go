@@ -16,19 +16,40 @@ import (
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 // IsEmailValid checks if email has valid length, match regex and host exists
-func IsEmailValid(email string) bool {
-	if len(email) < 3 && len(email) > 254 {
-		return false
+func IsEmailValid(email string) error {
+	if len(email) < 3 {
+		return &HelperError{
+			Code:    409,
+			Message: ErrEmailTooShort,
+			Wrapped: fmt.Errorf("email is too short: %s", email),
+		}
 	}
+
+	if len(email) > 254 {
+		return &HelperError{
+			Code:    409,
+			Message: ErrEmailTooLong,
+			Wrapped: fmt.Errorf("email is too long: %s", email),
+		}
+	}
+
 	if !emailRegex.MatchString(email) {
-		return false
+		return &HelperError{
+			Code:    409,
+			Message: ErrEmailBadFormat,
+			Wrapped: fmt.Errorf("email is in bad format: %s", email),
+		}
 	}
 	parts := strings.Split(email, "@")
 	mx, err := net.LookupMX(parts[1])
 	if err != nil || len(mx) == 0 {
-		return false
+		return &HelperError{
+			Code:    409,
+			Message: ErrEmailDomainNotExist,
+			Wrapped: fmt.Errorf("domain email doesn't exist: %s", email),
+		}
 	}
-	return true
+	return nil
 }
 
 func UsernameValidity(username string) error {
